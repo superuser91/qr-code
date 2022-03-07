@@ -1,8 +1,7 @@
 {
-    "name": "endroid/qr-code",
-    "description": "Endroid QR Code",
-    "keywords": ["endroid", "qrcode", "qr", "code", "php"],
-    "homepage": "https://github.com/endroid/qr-code",
+    "name": "vgplay/qr-code",
+    "description": "VGPlay QR Code",
+    "keywords": ["vgplay", "qrcode", "qr", "code", "php"],
     "type": "library",
     "license": "MIT",
     "authors": [

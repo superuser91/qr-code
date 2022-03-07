@@ -47,15 +47,7 @@ interface BuilderInterface
 
     public function logoPunchoutBackground(bool $logoPunchoutBackground): BuilderInterface;
 
-    public function labelText(string $labelText): BuilderInterface;
-
-    public function labelFont(FontInterface $labelFont): BuilderInterface;
-
-    public function labelAlignment(LabelAlignmentInterface $labelAlignment): BuilderInterface;
-
-    public function labelMargin(MarginInterface $labelMargin): BuilderInterface;
-
-    public function labelTextColor(ColorInterface $labelTextColor): BuilderInterface;
+    public function addLabel(string $labelText, FontInterface $labelFont, LabelAlignmentInterface $labelAlignment, MarginInterface $labelMargin = null, ColorInterface $labelTextColor = null): BuilderInterface;
 
     public function validateResult(bool $validateResult): BuilderInterface;
 

@@ -142,37 +142,25 @@ class Builder implements BuilderInterface
         return $this;
     }
 
-    public function labelText(string $labelText): BuilderInterface
+    public function addLabel(string $labelText, FontInterface $labelFont, LabelAlignmentInterface $labelAlignment, MarginInterface $labelMargin = null, ColorInterface $labelTextColor = null): BuilderInterface
     {
-        $this->options['labelText'] = $labelText;
+        if (!isset($this->options['labelPrefixs'])) {
+            $this->options['labelPrefixs'] = [];
+        }
 
-        return $this;
-    }
+        $labelOrder = count($this->options['labelPrefixs']);
 
-    public function labelFont(FontInterface $labelFont): BuilderInterface
-    {
-        $this->options['labelFont'] = $labelFont;
+        $this->options['labelPrefixs'][] = 'label' . $labelOrder;
 
-        return $this;
-    }
+        $this->options['label' . $labelOrder . 'Text'] = $labelText;
 
-    public function labelAlignment(LabelAlignmentInterface $labelAlignment): BuilderInterface
-    {
-        $this->options['labelAlignment'] = $labelAlignment;
+        $this->options['label' . $labelOrder . 'Font'] = $labelFont;
 
-        return $this;
-    }
+        $this->options['label' . $labelOrder . 'Alignment'] = $labelAlignment;
 
-    public function labelMargin(MarginInterface $labelMargin): BuilderInterface
-    {
-        $this->options['labelMargin'] = $labelMargin;
+        $this->options['label' . $labelOrder . 'Margin'] = $labelMargin;
 
-        return $this;
-    }
-
-    public function labelTextColor(ColorInterface $labelTextColor): BuilderInterface
-    {
-        $this->options['labelTextColor'] = $labelTextColor;
+        $this->options['label' . $labelOrder . 'TextColor'] = $labelTextColor;
 
         return $this;
     }
@@ -193,7 +181,7 @@ class Builder implements BuilderInterface
         $writer = $this->options['writer'];
 
         if ($this->options['validateResult'] && !$writer instanceof ValidatingWriterInterface) {
-            throw new \Exception('Unable to validate result with '.get_class($writer));
+            throw new \Exception('Unable to validate result with ' . get_class($writer));
         }
 
         /** @var QrCode $qrCode */
@@ -202,10 +190,13 @@ class Builder implements BuilderInterface
         /** @var LogoInterface|null $logo */
         $logo = $this->buildObject($this->options['logoClass'], 'logo');
 
-        /** @var LabelInterface|null $label */
-        $label = $this->buildObject($this->options['labelClass'], 'label');
+        /** @var array $labels*/
+        $labels = [];
+        foreach (($this->options['labelPrefixs'] ?? []) as $index => $labelPrefix) {
+            $labels[] = $this->buildLabelObject($this->options['labelClass'], 'label', $index);
+        }
 
-        $result = $writer->write($qrCode, $logo, $label, $this->options['writerOptions']);
+        $result = $writer->write($qrCode, $logo, $labels, $this->options['writerOptions']);
 
         if ($this->options['validateResult'] && $writer instanceof ValidatingWriterInterface) {
             $writer->validateResult($result, $qrCode->getData());
@@ -231,10 +222,50 @@ class Builder implements BuilderInterface
         $constructor = $reflectionClass->getConstructor();
         $constructorParameters = $constructor->getParameters();
         foreach ($constructorParameters as $parameter) {
-            $optionName = null === $optionsPrefix ? $parameter->getName() : $optionsPrefix.ucfirst($parameter->getName());
+            $optionName = null === $optionsPrefix ? $parameter->getName() : $optionsPrefix . ucfirst($parameter->getName());
             if (isset($this->options[$optionName])) {
                 $hasBuilderOptions = true;
                 $arguments[] = $this->options[$optionName];
+            } elseif ($parameter->isDefaultValueAvailable()) {
+                $arguments[] = $parameter->getDefaultValue();
+            } else {
+                $missingRequiredArguments[] = $optionName;
+            }
+        }
+
+        if (!$hasBuilderOptions) {
+            return null;
+        }
+
+        if (count($missingRequiredArguments) > 0) {
+            throw new \Exception(sprintf('Missing required arguments: %s', implode(', ', $missingRequiredArguments)));
+        }
+
+        return $reflectionClass->newInstanceArgs($arguments);
+    }
+
+    /**
+     * @param class-string $class
+     *
+     * @return mixed
+     */
+    private function buildLabelObject(string $class, string $optionsPrefix, $index)
+    {
+        /** @var \ReflectionClass<object> $reflectionClass */
+        $reflectionClass = new \ReflectionClass($class);
+
+        $arguments = [];
+        $hasBuilderOptions = false;
+        $missingRequiredArguments = [];
+        /** @var \ReflectionMethod $constructor */
+        $constructor = $reflectionClass->getConstructor();
+        $constructorParameters = $constructor->getParameters();
+        foreach ($constructorParameters as $parameter) {
+            $optionName = null === $optionsPrefix ? $parameter->getName() : $optionsPrefix . ucfirst($parameter->getName());
+            $labelOptionName = null === $optionsPrefix ? $parameter->getName() : $optionsPrefix . $index . ucfirst($parameter->getName());
+            if (isset($this->options[$labelOptionName])) {
+                $hasBuilderOptions = true;
+                $arguments[] = $this->options[$labelOptionName];
             } elseif ($parameter->isDefaultValueAvailable()) {
                 $arguments[] = $parameter->getDefaultValue();
             } else {

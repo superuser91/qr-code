@@ -18,7 +18,7 @@ use Zxing\QrReader;
 
 final class PngWriter implements WriterInterface, ValidatingWriterInterface
 {
-    public function write(QrCodeInterface $qrCode, LogoInterface $logo = null, LabelInterface $label = null, array $options = []): ResultInterface
+    public function write(QrCodeInterface $qrCode, LogoInterface $logo = null, array $labels = [], array $options = []): ResultInterface
     {
         if (!extension_loaded('gd')) {
             throw new \Exception('Unable to generate image: check your GD installation');
@@ -72,9 +72,11 @@ final class PngWriter implements WriterInterface, ValidatingWriterInterface
         $targetWidth = $matrix->getOuterSize();
         $targetHeight = $matrix->getOuterSize();
 
-        if ($label instanceof LabelInterface) {
-            $labelImageData = LabelImageData::createForLabel($label);
-            $targetHeight += $labelImageData->getHeight() + $label->getMargin()->getTop() + $label->getMargin()->getBottom();
+        foreach ($labels as $label) {
+            if ($label instanceof LabelInterface) {
+                $labelImageData[] = $temp = LabelImageData::createForLabel($label);
+                $targetHeight += $temp->getHeight() + $label->getMargin()->getTop() + $label->getMargin()->getBottom();
+            }
         }
 
         $targetImage = imagecreatetruecolor($targetWidth, $targetHeight);
@@ -121,8 +123,11 @@ final class PngWriter implements WriterInterface, ValidatingWriterInterface
             $result = $this->addLogo($logo, $result);
         }
 
-        if ($label instanceof LabelInterface) {
-            $result = $this->addLabel($label, $result);
+        krsort($labels);
+        foreach ($labels as $label) {
+            if ($label instanceof LabelInterface) {
+                $result = $this->addLabel($label, $result);
+            }
         }
 
         return $result;
@@ -184,6 +189,7 @@ final class PngWriter implements WriterInterface, ValidatingWriterInterface
 
     private function addLabel(LabelInterface $label, PngResult $result): PngResult
     {
+        static $y = null;
         $targetImage = $result->getImage();
 
         $labelImageData = LabelImageData::createForLabel($label);
@@ -197,8 +203,12 @@ final class PngWriter implements WriterInterface, ValidatingWriterInterface
             $label->getTextColor()->getAlpha()
         );
 
+        if (is_null($y)) {
+            $y = imagesy($targetImage);
+        }
+
         $x = intval(imagesx($targetImage) / 2 - $labelImageData->getWidth() / 2);
-        $y = imagesy($targetImage) - $label->getMargin()->getBottom();
+        $y -= $label->getMargin()->getBottom() + intval($labelImageData->getHeight() / 2);
 
         if ($label->getAlignment() instanceof LabelAlignmentLeft) {
             $x = $label->getMargin()->getLeft();
@@ -207,6 +217,8 @@ final class PngWriter implements WriterInterface, ValidatingWriterInterface
         }
 
         imagettftext($targetImage, $label->getFont()->getSize(), 0, $x, $y, $textColor, $label->getFont()->getPath(), $label->getText());
+
+        $y -= $label->getMargin()->getTop();
 
         return new PngResult($targetImage);
     }
@@ -225,7 +237,7 @@ final class PngWriter implements WriterInterface, ValidatingWriterInterface
 
         $reader = new QrReader($string, QrReader::SOURCE_TYPE_BLOB);
         if ($reader->text() !== $expectedData) {
-            throw new \Exception('Built-in validation reader read "'.$reader->text().'" instead of "'.$expectedData.'".
+            throw new \Exception('Built-in validation reader read "' . $reader->text() . '" instead of "' . $expectedData . '".
                  Adjust your parameters to increase readability or disable built-in validation.');
         }
     }
